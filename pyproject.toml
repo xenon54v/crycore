@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cryptocore"
+version = "0.1.0"
+description = "Educational cryptographic command-line toolkit"
+requires-python = ">=3.10"
+dependencies = [
+    "pycryptodome"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest"
+]
+
+[project.scripts]
+cryptocore = "cryptocore.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
