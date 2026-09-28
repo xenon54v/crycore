@@ -1,151 +1,162 @@
-# CryptoCore
+## Sprint 2
 
-CryptoCore — учебная консольная программа для шифрования и расшифрования файлов с использованием AES-128 в режиме ECB.
+Во втором спринте в CryptoCore была добавлена поддержка новых режимов работы AES:
 
-## Возможности
+- CBC;
+- CFB-128;
+- OFB;
+- CTR.
 
-- шифрование файлов алгоритмом AES-128;
-- расшифрование файлов;
-- режим ECB;
-- дополнение данных по стандарту PKCS#7;
-- работа с текстовыми и бинарными файлами;
-- проверка корректности ключа;
-- обработка ошибок командной строки.
+Режимы CBC, CFB, OFB и CTR используют 16-байтовый IV.
 
-## Требования
-
-- Python 3.10 или новее;
-- pycryptodome;
-- pytest для запуска тестов.
-
-## Установка
-
-Создать виртуальное окружение:
-
-```powershell
-python -m venv .venv
-```
-
-Активировать его:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-Установить зависимости:
-
-```powershell
-pip install -r requirements.txt
-```
-
-Установить проект в режиме разработки:
-
-```powershell
-pip install -e .
-```
-
-После установки становится доступна команда:
-
-```powershell
-cryptocore
-```
-
-## Использование
-
-### Шифрование
-
-```powershell
-cryptocore --algorithm aes --mode ecb --encrypt --key 000102030405060708090a0b0c0d0e0f --input plaintext.txt --output encrypted.bin
-```
-
-### Расшифрование
-
-```powershell
-cryptocore --algorithm aes --mode ecb --decrypt --key 000102030405060708090a0b0c0d0e0f --input encrypted.bin --output decrypted.txt
-```
-
-Ключ AES-128 должен содержать ровно 16 байт и передаваться в шестнадцатеричном формате.
-
-Пример корректного ключа:
+При шифровании IV генерируется автоматически с помощью `os.urandom(16)` и записывается в начало выходного файла:
 
 ```text
-000102030405060708090a0b0c0d0e0f
+<16-byte IV><ciphertext>
 ```
 
-## Структура проекта
+При расшифровании IV можно получить двумя способами:
+
+1. автоматически из первых 16 байт входного файла;
+2. явно передать через параметр `--iv`.
+
+## Использование CBC
+
+Шифрование:
+
+```powershell
+cryptocore --algorithm aes --mode cbc --encrypt --key 000102030405060708090a0b0c0d0e0f --input plaintext.txt --output encrypted.bin
+```
+
+Расшифрование с IV из файла:
+
+```powershell
+cryptocore --algorithm aes --mode cbc --decrypt --key 000102030405060708090a0b0c0d0e0f --input encrypted.bin --output decrypted.txt
+```
+
+Расшифрование с явно указанным IV:
+
+```powershell
+cryptocore --algorithm aes --mode cbc --decrypt --key 000102030405060708090a0b0c0d0e0f --iv AABBCCDDEEFF00112233445566778899 --input ciphertext.bin --output decrypted.txt
+```
+
+## Использование CFB
+
+Шифрование:
+
+```powershell
+cryptocore --algorithm aes --mode cfb --encrypt --key 000102030405060708090a0b0c0d0e0f --input plaintext.txt --output encrypted.bin
+```
+
+Расшифрование:
+
+```powershell
+cryptocore --algorithm aes --mode cfb --decrypt --key 000102030405060708090a0b0c0d0e0f --input encrypted.bin --output decrypted.txt
+```
+
+## Использование OFB
+
+Шифрование:
+
+```powershell
+cryptocore --algorithm aes --mode ofb --encrypt --key 000102030405060708090a0b0c0d0e0f --input plaintext.txt --output encrypted.bin
+```
+
+Расшифрование:
+
+```powershell
+cryptocore --algorithm aes --mode ofb --decrypt --key 000102030405060708090a0b0c0d0e0f --input encrypted.bin --output decrypted.txt
+```
+
+## Использование CTR
+
+Шифрование:
+
+```powershell
+cryptocore --algorithm aes --mode ctr --encrypt --key 000102030405060708090a0b0c0d0e0f --input plaintext.txt --output encrypted.bin
+```
+
+Расшифрование:
+
+```powershell
+cryptocore --algorithm aes --mode ctr --decrypt --key 000102030405060708090a0b0c0d0e0f --input encrypted.bin --output decrypted.txt
+```
+
+## Особенности режимов
+
+ECB и CBC используют дополнение PKCS#7.
+
+CFB, OFB и CTR работают как потоковые режимы и не используют padding. Поэтому размер зашифрованных данных в этих режимах совпадает с размером исходных данных.
+
+## Структура проекта после Sprint 2
 
 ```text
 src/
 └── cryptocore/
     ├── cli.py
     ├── file_io.py
+    ├── iv.py
     ├── crypto/
     │   └── aes.py
     └── modes/
-        └── ecb.py
+        ├── ecb.py
+        ├── cbc.py
+        ├── cfb.py
+        ├── ofb.py
+        └── ctr.py
 
 tests/
 ├── test_cli.py
 ├── test_ecb.py
+├── test_cbc.py
+├── test_cfb.py
+├── test_ofb.py
+├── test_ctr.py
+├── test_iv.py
 └── test_padding.py
 ```
 
-`aes.py` содержит работу с AES-примитивом.
+## Тестирование Sprint 2
 
-`ecb.py` реализует обработку блоков в режиме ECB и дополнение PKCS#7.
-
-`file_io.py` отвечает за чтение и запись бинарных файлов.
-
-`cli.py` реализует интерфейс командной строки.
-
-## Тестирование
-
-Для запуска всех тестов:
+Для запуска всех тестов используется команда:
 
 ```powershell
 pytest -v
 ```
 
-На текущем этапе Sprint 1 реализовано 25 автоматических тестов.
+Во втором спринте дополнительно проверяются:
 
-Проверяется:
+- генерация IV;
+- проверка длины IV;
+- режим CBC;
+- режим CFB-128;
+- режим OFB;
+- режим CTR;
+- работа с частичными блоками;
+- отсутствие padding в потоковых режимах;
+- автоматическое чтение IV из начала файла;
+- работа с явно переданным параметром `--iv`;
+- полный цикл шифрования и расшифрования файлов.
 
-- PKCS#7 padding;
-- PKCS#7 unpadding;
-- шифрование и расшифрование;
-- работа с несколькими блоками;
-- пустые данные;
-- бинарные данные;
-- неправильный ключ;
-- повреждённые зашифрованные данные;
-- ошибки командной строки;
-- полный цикл шифрования и расшифрования файла.
+## Совместимость с OpenSSL
 
-## Проверка полного цикла
+В Sprint 2 необходимо проверить совместимость CryptoCore с OpenSSL в двух направлениях:
 
-Создать файл:
-
-```powershell
-"Hello CryptoCore!" | Set-Content -Encoding UTF8 plaintext.txt
+```text
+CryptoCore -> OpenSSL
+OpenSSL -> CryptoCore
 ```
 
-Зашифровать:
+Для проверки должен использоваться одинаковый AES-128 ключ и одинаковый IV.
+
+Пример расшифрования файла через OpenSSL:
 
 ```powershell
-cryptocore --algorithm aes --mode ecb --encrypt --key 000102030405060708090a0b0c0d0e0f --input plaintext.txt --output encrypted.bin
+openssl enc -aes-128-cbc -d -K 000102030405060708090a0b0c0d0e0f -iv AABBCCDDEEFF00112233445566778899 -in ciphertext.bin -out decrypted.txt
 ```
 
-Расшифровать:
+Пример шифрования через OpenSSL:
 
 ```powershell
-cryptocore --algorithm aes --mode ecb --decrypt --key 000102030405060708090a0b0c0d0e0f --input encrypted.bin --output decrypted.txt
+openssl enc -aes-128-cbc -K 000102030405060708090a0b0c0d0e0f -iv AABBCCDDEEFF00112233445566778899 -in plaintext.txt -out ciphertext.bin
 ```
-
-Для проверки совпадения файлов можно сравнить их SHA-256:
-
-```powershell
-(Get-FileHash plaintext.txt -Algorithm SHA256).Hash
-(Get-FileHash decrypted.txt -Algorithm SHA256).Hash
-```
-
-Хэши исходного и расшифрованного файлов должны совпадать.
