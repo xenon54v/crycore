@@ -160,3 +160,129 @@ openssl enc -aes-128-cbc -d -K 000102030405060708090a0b0c0d0e0f -iv AABBCCDDEEFF
 ```powershell
 openssl enc -aes-128-cbc -K 000102030405060708090a0b0c0d0e0f -iv AABBCCDDEEFF00112233445566778899 -in plaintext.txt -out ciphertext.bin
 ```
+
+## OpenSSL interoperability tests
+
+Для проверки совместимости CryptoCore с OpenSSL используется один и тот же AES-128 ключ и одинаковый IV.
+
+Ключ:
+
+```text
+000102030405060708090a0b0c0d0e0f
+```
+
+Пример IV:
+
+```text
+AABBCCDDEEFF00112233445566778899
+```
+
+### CryptoCore -> OpenSSL
+
+Сначала файл шифруется через CryptoCore:
+
+```powershell
+cryptocore --algorithm aes --mode cbc --encrypt --key 000102030405060708090a0b0c0d0e0f --input plain.txt --output crypto_cbc.bin
+```
+
+Первые 16 байт файла содержат IV. Его нужно отделить от ciphertext.
+
+Пример для PowerShell:
+
+```powershell
+$bytes = [System.IO.File]::ReadAllBytes("crypto_cbc.bin")
+
+$iv = $bytes[0..15]
+$ciphertext = $bytes[16..($bytes.Length - 1)]
+
+[System.IO.File]::WriteAllBytes("cbc_cipher_only.bin", $ciphertext)
+
+$ivHex = ($iv | ForEach-Object { $_.ToString("x2") }) -join ""
+```
+
+После этого ciphertext можно расшифровать через OpenSSL:
+
+```powershell
+openssl enc -aes-128-cbc -d -K 000102030405060708090a0b0c0d0e0f -iv $ivHex -in cbc_cipher_only.bin -out openssl_decrypted.txt
+```
+
+Аналогично можно проверить остальные режимы:
+
+```powershell
+openssl enc -aes-128-cfb -d -K 000102030405060708090a0b0c0d0e0f -iv $ivHex -in cfb_cipher_only.bin -out openssl_cfb_decrypted.txt
+```
+
+```powershell
+openssl enc -aes-128-ofb -d -K 000102030405060708090a0b0c0d0e0f -iv $ivHex -in ofb_cipher_only.bin -out openssl_ofb_decrypted.txt
+```
+
+```powershell
+openssl enc -aes-128-ctr -d -K 000102030405060708090a0b0c0d0e0f -iv $ivHex -in ctr_cipher_only.bin -out openssl_ctr_decrypted.txt
+```
+
+### OpenSSL -> CryptoCore
+
+Сначала файл шифруется через OpenSSL.
+
+CBC:
+
+```powershell
+openssl enc -aes-128-cbc -K 000102030405060708090a0b0c0d0e0f -iv AABBCCDDEEFF00112233445566778899 -in plain.txt -out openssl_cbc.bin
+```
+
+После этого файл расшифровывается через CryptoCore:
+
+```powershell
+cryptocore --algorithm aes --mode cbc --decrypt --key 000102030405060708090a0b0c0d0e0f --iv AABBCCDDEEFF00112233445566778899 --input openssl_cbc.bin --output decrypted_cbc.txt
+```
+
+CFB:
+
+```powershell
+openssl enc -aes-128-cfb -K 000102030405060708090a0b0c0d0e0f -iv AABBCCDDEEFF00112233445566778899 -in plain.txt -out openssl_cfb.bin
+```
+
+```powershell
+cryptocore --algorithm aes --mode cfb --decrypt --key 000102030405060708090a0b0c0d0e0f --iv AABBCCDDEEFF00112233445566778899 --input openssl_cfb.bin --output decrypted_cfb.txt
+```
+
+OFB:
+
+```powershell
+openssl enc -aes-128-ofb -K 000102030405060708090a0b0c0d0e0f -iv AABBCCDDEEFF00112233445566778899 -in plain.txt -out openssl_ofb.bin
+```
+
+```powershell
+cryptocore --algorithm aes --mode ofb --decrypt --key 000102030405060708090a0b0c0d0e0f --iv AABBCCDDEEFF00112233445566778899 --input openssl_ofb.bin --output decrypted_ofb.txt
+```
+
+CTR:
+
+```powershell
+openssl enc -aes-128-ctr -K 000102030405060708090a0b0c0d0e0f -iv AABBCCDDEEFF00112233445566778899 -in plain.txt -out openssl_ctr.bin
+```
+
+```powershell
+cryptocore --algorithm aes --mode ctr --decrypt --key 000102030405060708090a0b0c0d0e0f --iv AABBCCDDEEFF00112233445566778899 --input openssl_ctr.bin --output decrypted_ctr.txt
+```
+
+### Автоматическая проверка
+
+Для автоматической проверки совместимости используется файл:
+
+```text
+tests/test_openssl_interop.py
+```
+
+Запуск:
+
+```powershell
+pytest tests/test_openssl_interop.py -v
+```
+
+Тесты проверяют оба направления для всех режимов CBC, CFB, OFB и CTR:
+
+```text
+CryptoCore -> OpenSSL
+OpenSSL -> CryptoCore
+```
