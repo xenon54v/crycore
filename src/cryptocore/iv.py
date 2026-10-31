@@ -1,13 +1,17 @@
-import os
+from cryptocore.csprng import generate_random_bytes
+
 
 IV_SIZE = 16
 
+
 def generate_iv() -> bytes:
-    return os.urandom(IV_SIZE)
+    return generate_random_bytes(IV_SIZE)
+
 
 def validate_iv(iv: bytes) -> None:
     if len(iv) != IV_SIZE:
         raise ValueError("IV must be exactly 16 bytes")
+
 
 def parse_iv(iv_hex: str) -> bytes:
     try:

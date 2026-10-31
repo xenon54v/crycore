@@ -9,6 +9,7 @@ from cryptocore.modes import cbc
 from cryptocore.modes import cfb
 from cryptocore.modes import ofb
 from cryptocore.modes import ctr
+from cryptocore.csprng import generate_random_bytes
 
 IV_SIZE = 16
 
@@ -48,7 +49,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--key",
-        required=True,
         help="AES-128 key as a hexadecimal string"
     )
 
@@ -67,7 +67,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         dest="output_file",
-        required=True,
         help="Output file path"
     )
 
@@ -148,12 +147,48 @@ def decrypt_data(
 
     raise ValueError(f"Unsupported mode: {mode}")
 
+def get_key(key_hex: str | None, encrypting: bool) -> bytes:
+    if key_hex is not None:
+        key = parse_key(key_hex)
+
+        if is_weak_key(key):
+            print(
+                "[WARNING] The provided key appears to be weak",
+                file=sys.stderr
+            )
+
+        return key
+
+    if not encrypting:
+        raise ValueError("--key is required for decryption")
+
+    key = generate_random_bytes(16)
+
+    print(f"[INFO] Generated random key: {key.hex()}")
+
+    return key
+
+def is_weak_key(key: bytes) -> bool:
+    if key == bytes(16):
+        return True
+
+    if key == bytes(range(16)):
+        return True
+
+    if key == bytes(range(1, 17)):
+        return True
+
+    if len(set(key)) == 1:
+        return True
+
+    return False
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
     try:
-        key = parse_key(args.key)
+        key = get_key(args.key, args.encrypt)
         data = read_file(args.input_file)
 
         if args.encrypt:
@@ -170,8 +205,14 @@ def main() -> None:
                 key,
                 args.iv
             )
+        output_file = args.output_file
 
-        write_file(args.output_file, result)
+        if output_file is None:
+            if args.encrypt:
+                output_file = "encrypted.bin"
+            else:
+                output_file = "decrypted.bin"
+        write_file(output_file, result)
 
     except (ValueError, FileNotFoundError, OSError) as error:
         print(f"Error: {error}", file=sys.stderr)

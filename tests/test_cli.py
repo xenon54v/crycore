@@ -1,8 +1,11 @@
 import pytest
 
+from cryptocore.modes import ecb
+
 from cryptocore.cli import (
     build_parser,
     parse_key,
+    get_key,
     encrypt_data,
     decrypt_data,
     main,
@@ -219,3 +222,135 @@ def test_operation_is_required():
 
     with pytest.raises(SystemExit):
         parser.parse_args(args)
+
+def test_default_output_encrypt(tmp_path, monkeypatch):
+    input_file = tmp_path / "input.txt"
+    input_file.write_bytes(b"Hello")
+
+    monkeypatch.chdir(tmp_path)
+
+    args = [
+        "cryptocore",
+        "--algorithm", "aes",
+        "--mode", "ecb",
+        "--encrypt",
+        "--key", VALID_KEY_HEX,
+        "--input", str(input_file),
+    ]
+
+    monkeypatch.setattr("sys.argv", args)
+    main()
+
+    assert (tmp_path / "encrypted.bin").exists()
+
+
+def test_default_output_decrypt(tmp_path, monkeypatch):
+    input_file = tmp_path / "input.txt"
+    encrypted_file = tmp_path / "encrypted.bin"
+
+    input_file.write_bytes(b"Hello")
+    encrypted_file.write_bytes(
+        ecb.encrypt(input_file.read_bytes(), VALID_KEY)
+    )
+
+    monkeypatch.chdir(tmp_path)
+
+    args = [
+        "cryptocore",
+        "--algorithm", "aes",
+        "--mode", "ecb",
+        "--decrypt",
+        "--key", VALID_KEY_HEX,
+        "--input", str(encrypted_file),
+    ]
+
+    monkeypatch.setattr("sys.argv", args)
+    main()
+
+    assert (tmp_path / "decrypted.bin").read_bytes() == b"Hello"
+
+def test_generated_key_encrypt_and_decrypt(tmp_path, monkeypatch, capsys):
+    input_file = tmp_path / "input.bin"
+    encrypted_file = tmp_path / "encrypted.bin"
+    decrypted_file = tmp_path / "decrypted.bin"
+
+    original_data = b"CryptoCore Sprint 3 generated key test\x00\x01\xff"
+    input_file.write_bytes(original_data)
+
+    encrypt_args = [
+        "cryptocore",
+        "--algorithm", "aes",
+        "--mode", "ctr",
+        "--encrypt",
+        "--input", str(input_file),
+        "--output", str(encrypted_file),
+    ]
+
+    monkeypatch.setattr("sys.argv", encrypt_args)
+    main()
+
+    captured = capsys.readouterr()
+
+    prefix = "[INFO] Generated random key: "
+    assert prefix in captured.out
+
+    generated_key = captured.out.strip().replace(prefix, "")
+
+    assert len(generated_key) == 32
+
+    decrypt_args = [
+        "cryptocore",
+        "--algorithm", "aes",
+        "--mode", "ctr",
+        "--decrypt",
+        "--key", generated_key,
+        "--input", str(encrypted_file),
+        "--output", str(decrypted_file),
+    ]
+
+    monkeypatch.setattr("sys.argv", decrypt_args)
+    main()
+
+    assert decrypted_file.read_bytes() == original_data
+
+def test_decryption_requires_key(tmp_path, monkeypatch):
+    input_file = tmp_path / "encrypted.bin"
+    output_file = tmp_path / "decrypted.bin"
+
+    input_file.write_bytes(b"1234567890123456")
+
+    args = [
+        "cryptocore",
+        "--algorithm", "aes",
+        "--mode", "ctr",
+        "--decrypt",
+        "--input", str(input_file),
+        "--output", str(output_file),
+    ]
+
+    monkeypatch.setattr("sys.argv", args)
+
+    with pytest.raises(SystemExit) as error:
+        main()
+
+    assert error.value.code == 1
+
+def test_weak_key_warning(capsys):
+    weak_key = "00000000000000000000000000000000"
+
+    key = get_key(weak_key, True)
+
+    captured = capsys.readouterr()
+
+    assert len(key) == 16
+    assert "[WARNING] The provided key appears to be weak" in captured.err
+
+def test_normal_key_no_warning(capsys):
+    normal_key = "7f3a91c4d2e68510b7cc49a2356d8ef1"
+
+    key = get_key(normal_key, True)
+
+    captured = capsys.readouterr()
+
+    assert len(key) == 16
+    assert captured.err == ""

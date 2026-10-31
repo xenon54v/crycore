@@ -4,6 +4,7 @@ import subprocess
 import pytest
 
 from cryptocore.cli import encrypt_data, decrypt_data
+from cryptocore.modes import ecb
 
 KEY_HEX = "000102030405060708090a0b0c0d0e0f"
 KEY = bytes.fromhex(KEY_HEX)
@@ -103,3 +104,37 @@ def test_openssl_to_cryptocore(tmp_path, mode):
     )
 
     assert decrypted == original_data
+
+def test_ecb_cryptocore_to_openssl(tmp_path):
+    openssl = get_openssl()
+
+    original_data = b"CryptoCore ECB OpenSSL test"
+
+    cryptocore_encrypted = ecb.encrypt(
+        original_data,
+        KEY
+    )
+
+    plain_file = tmp_path / "plain.bin"
+    openssl_encrypted_file = tmp_path / "openssl_ecb.bin"
+
+    plain_file.write_bytes(original_data)
+
+    command = [
+        openssl,
+        "enc",
+        "-aes-128-ecb",
+        "-K", KEY_HEX,
+        "-nosalt",
+        "-in", str(plain_file),
+        "-out", str(openssl_encrypted_file),
+    ]
+
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert openssl_encrypted_file.read_bytes() == cryptocore_encrypted

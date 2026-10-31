@@ -11,3 +11,5 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+nist_test_data.bin
