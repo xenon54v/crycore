@@ -10,6 +10,7 @@ from cryptocore.modes import cfb
 from cryptocore.modes import ofb
 from cryptocore.modes import ctr
 from cryptocore.csprng import generate_random_bytes
+from cryptocore.hash.file_hash import hash_file, hash_stream
 
 IV_SIZE = 16
 
@@ -183,7 +184,79 @@ def is_weak_key(key: bytes) -> bool:
 
     return False
 
+def handle_dgst(args: list[str]) -> None:
+    parser = argparse.ArgumentParser(
+        prog="cryptocore dgst",
+        description="Compute file message digest"
+    )
+
+    parser.add_argument(
+        "--algorithm",
+        required=True,
+        choices=["sha256", "sha3-256"],
+        help="Hash algorithm"
+    )
+
+    parser.add_argument(
+        "--input",
+        dest="input_file",
+        required=True,
+        help="Input file path"
+    )
+
+    parser.add_argument(
+        "--output",
+        dest="output_file",
+        help="Write digest result to a file"
+    )
+
+    parsed = parser.parse_args(args)
+
+    if parsed.input_file == "-":
+        digest = hash_stream(
+            sys.stdin.buffer,
+            parsed.algorithm
+        )
+    else:
+        digest = hash_file(
+            parsed.input_file,
+            parsed.algorithm
+        )
+
+    result = f"{digest}  {parsed.input_file}"
+
+    if parsed.output_file:
+        try:
+            with open(
+                parsed.output_file,
+                "w",
+                encoding="utf-8"
+            ) as file:
+                file.write(result + "\n")
+        except OSError as error:
+            raise OSError(
+                f"Could not write output file: {parsed.output_file}"
+            ) from error
+    else:
+        print(result)
+
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "dgst":
+        try:
+            handle_dgst(sys.argv[2:])
+        except (
+            ValueError,
+            FileNotFoundError,
+            OSError
+        ) as error:
+            print(
+                f"Error: {error}",
+                file=sys.stderr
+            )
+            sys.exit(1)
+
+        return
+
     parser = build_parser()
     args = parser.parse_args()
 
